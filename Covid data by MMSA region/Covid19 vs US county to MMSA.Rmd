@@ -1,0 +1,113 @@
+---
+title: "Covid19 vs US county to MMSA"
+author: "Amanda Kimball"
+date: "11/3/2020"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This markdown will review and clean the Center for Disease Controls Covid19 by county datasets (2020). Here I will read in the data and then review the first 5 elements. It shows that the County FIPS code, County Name, State, and State FIPS code are the first 4 elements. This is followed by a date (Jan. 22, 2020 is displayed Only) with the  cumulative total cases for the county in question. The death data is in the same format.
+
+```{r}
+covid19cases <- read.csv("covid_confirmed_usafacts.csv", stringsAsFactors = FALSE)
+covid19deaths <- read.csv("covid_deaths_usafacts.csv", stringsAsFactors = FALSE)
+
+str(covid19cases[1:5])
+
+```
+
+I review to see if any of the values are N/A and find the data set fully intact.This was expected since it was downloaded from the CDC's visualization page.
+
+```{r}
+covid19deaths[is.na(covid19deaths),]
+covid19cases[is.na(covid19cases),]
+```
+
+I will create a data frame with all of the necessary attributes from the 2 data sets. I choose to select the last day in September 2020 for the analysis, so that most of the death data is fully updated. This avoids most of the delay associated with the collection of death certificate data. 
+
+```{r}
+covid19 <- data.frame("County" = as.character(covid19cases$County.Name),
+                      "State" = as.character(covid19cases$State), 
+                      "ST_FIPS" = covid19cases$stateFIPS, 
+                      "Cases" = covid19cases$X9.30.20, 
+                      "Deaths" = covid19deaths$X9.30.20,
+                      stringsAsFactors = FALSE)
+summary(covid19)
+```
+
+I downloaded the delineation data from US Census Bureau (2020) to obtain a cross reference between county data in the CDC dataset and MMSA data in the BRFSS dataset that I will be using at a later date. I renamed the headers to match up with the CDC dataset and created a new column for the MMSA without the state which is consistent with the BRFSS dataset.
+
+```{r}
+county_MMSA <- read.csv("County to MMSA list1_2020.csv", stringsAsFactors = FALSE)
+names(county_MMSA) <- c("MMSA_State", "County", "State", "ST_FIPS", "County_FIPS", "Central_Outlying")
+county_MMSA$MMSA <- gsub(",.*","", county_MMSA$MMSA_State)
+str(county_MMSA)
+```
+
+I summed up the cases and deaths as a check to insure that everything was in the right order of magnitude (compared with current reported case and death data for the US) and so I could further manipulate the data and then verify that nothing was lost or changed during the analysis. These values are consistent with the current reports of covid19 on the CDC website (Covid-19, 2020).
+
+```{r}
+sum(covid19$Cases)
+sum(covid19$Deaths)
+```
+
+I will first merge the covid-19 counts with the MMSA delineation data. I do that on county and also state FIPS code since those are the only 2 in common columns. Note state is abbreviated in the Covid-19 (2020) dataset. This will give me covid-19 counts by MMSA region. 
+
+```{r}
+covid_location <- merge(covid19, county_MMSA, all.x = TRUE, by = c("County","ST_FIPS"))
+summary(covid_location)
+```
+
+The counts remain the same after the merge, but there are some N/As in the dataset.
+
+```{r}
+sum(covid_location$Cases)
+sum(covid_location$Deaths)
+```
+There are 1377 counties which are not included in the MMSA units and will be removed from my listing. These will not align with the data from the BFRSS dataset and can not be used for this analysis. They will be removed during the location aggregation that I perform next. 
+
+```{r}
+covid_location[is.na(covid_location$County_FIPS),]
+```
+
+The aggregation functions will sum the covid cases and deaths by location, then merge them back together by MMSA region. 
+
+```{r}
+covid_case_location <- aggregate(covid_location$Cases~covid_location$MMSA, FUN = sum)
+covid_death_location <- aggregate(covid_location$Deaths~covid_location$MMSA, FUN = sum)
+
+covid_data <- merge(x = covid_case_location, y = covid_death_location, by = "covid_location$MMSA")
+names(covid_data) <- c("MMSA_NAME", "CASES", "DEATHS")
+```
+
+The sum of the cases and deaths are now decreased by the counties not listed inthe MMSA regions.
+
+```{r}
+sum(covid_data$CASES)
+sum(covid_data$DEATHS)
+```
+
+I calculate the death_rate as deaths per cases in the region.
+
+```{r}
+covid_data <- covid_data[covid_data$CASES>0,] #otherwise the death rate blows up due to divide by 0.
+covid_data$death_rate <- 100*covid_data$DEATHS/covid_data$CASES
+summary(covid_data)
+```
+
+I will export the data so that I can create GIS Maps in Tableau. 
+
+```{r}
+write.csv(covid_data, 'covid_MMSA.csv')
+```
+
+References:
+
+Unknown.(2020). Coronavirus disease 2019 (COVID-19): United States COVID-19 cases and deaths by County. Centers for Disease COntrol and Prevention. Retrieved October 28, 2020 from: http://covid.cdc.gov/covid-data-tracker/#county-map
+
+Unknown. (2020). Core based statistical areas (CBSAs), metropolitan divisions, and combined statistical areas (CSAs), March 2020. United States Census Bureau. Obtained November 3, 2020 from: https://www.census.gov/geographies/reference-files/time-series/demo/metro-micro/delineation-files.html
