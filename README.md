@@ -1,6 +1,6 @@
 # Project to predict Covid19 severity from the known health indicator data within a community
 
-This project utilizes the inforamtion from the center for disease controls Behavioral risk factor surveillance system to determine if Covid19 severity within a community can be predicted from known health indicators. 
+This project utilizes the information from the Center for Disease Controls Behavioral risk factor surveillance system (BRFSS, 2011-2017) to determine if Covid19 severity within a community can be predicted from known health indicators. 
 
 **This is a work in progress.** 
 
