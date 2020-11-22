@@ -1,0 +1,269 @@
+---
+title: "BRFSS 2017 Survey EDA - Health indicators"
+author: "Amanda Kimball"
+date: "11/17/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+The Smart: City and county survey data put together by the Center for Disease Control and Prevention: Behavioral risk factor surveillance system (Smart data, 2017). Contains a number of survey response data that is equally distributed across a range of areas referred to as Metropolitan and Micropolitan statistical areas. The survey data covers health indicators, diet choices, health insurance availability, demographics, and economic factors. This file will focus on the diabetes heath indicator.
+
+```{r}
+library(foreign)
+BRFSS2017 <- read.xport("MMSA2017.XPT")
+```
+
+I needed to create an additional factor with the county MMSA name and state separated from the full MMSANAME field. I used the gsub function to remove the MSA test and created the 2 new columns.
+
+I located the following variables within the dataset:
+
+These variables where inline with the risk factors listed on the cdc website: The most important factors listed by the CDC as conditions that increase a risk for COVID19 are: cancer, chronic kidney disease, chronic obstructive pulmonary disease, heart disease, immunocompromised organ transplant, obesity, sickle cell disease, smoking, and type 2 diabetes mellitus (CDC, 2020b). 
+
+BPHIGH4 - Ever been told you have high blood pressure? Yes - 1, Yes pregnant - 2, No - 3, No borderline - 4, not sure - 7, Refused - 9, blanks
+TOLDHI2 - Ever been told you have high cholestrol? Yes - 1, No - 2, not sure - 7, Refused - 9, blanks 
+CVDCRHD4 - Ever Diagnosed with Angina or Coronary Heart Disease? Yes - 1, No - 2, not sure - 7, Refused - 9, blanks 
+CHCOCNCR - Ever diagnosed with cancer (non-skin)? Yes - 1, No - 2, Not sure - 7, Refused - 9, blanks
+CHCKIDNY - Ever diagnosed with kidney disease? Yes - 1, No - 2, Not sure - 7, Refused - 9, blanks
+DIABETE3 - Ever diagnosed with diabetes? Yes - 1, Yes pregnant - 2, No - 3, No prediabetes - 4, not sure - 7, Refused - 9, blanks
+RFSMOK3 - Adults who are current smokers? No - 1, Yes - 2, not sure/Refused - 9, blanks
+
+I added the following due to it's potential to impact covid prevalence: i.e. large household size, lack of healthcare, 
+
+GENHLTH - Would you say that in general your health is: Excellent - 1, Very Good - 2, Good - 3, Fair - 4, Poor - 5, not sure -7, Refused - 9, blanks
+HLTHPLN1 - Do you have any kind of health care coverage? Yes - 1, No - 2, Not sure - 7, Refused - 9, blanks
+
+```{r}
+data <- subset(BRFSS2017, select = c(5, 9, 13, 16, 19, 24, 28:29, 124, 133, 174, 175, 177))
+data$MMSANAME <- lapply(data$MMSANAME, as.character)
+
+data$MMSANAME <- gsub(", Metropolitan Statistical Area", "", data$MMSANAME)
+data$MMSANAME <- gsub(", Micropolitan Statistical Area", "", data$MMSANAME)
+data$MMSANAME <- gsub(", Metropolitan Division", "", data$MMSANAME)
+names(data) <- c("General_health", "Health_coverage", "Blood_pressure_high", "Cholesterol_high",
+                    "Coronary_heart_disease", "cancer", "Kidney_disease", "Diabetes", "Age", "Smoke",
+                    "MMSA_Number", "WT_Factor", "MMSA_NAME")
+str(data)
+```
+
+Here are the calculated body mass indicator variables. As shown there are several missing values.
+
+```{r}
+summary(data)
+```
+
+The 9 value's are essential N/A's.  Everything else is presents absence characteristics. Even the high cholesterol indication is proceeded by a question asking if the participant had cholesterol in the last 5 years. THe N/As here are mostly participants indicating that they have not had a cholesterol check. 
+
+All N/As will be coded as 9. 
+
+```{r}
+index <- is.na(data[1])
+data[index, 1] <- 9
+index <- is.na(data[4])
+data[index, 4] <- 9
+index <- is.na(data[7])
+data[index, 7] <- 9
+index <- is.na(data[8])
+data[index, 8] <- 9
+
+summary(data)
+```
+
+I am going to create dummy variables for each of the categories individually based off their conditions from above. i retain both yes, no and unknown values in case they are needed in future analysis.
+
+For general health, I will have good, bad and unknown categories. I keep an unknown value so that I can remove those individuals from the regional estimate for percentage of the region with a condition.
+
+General Health - Would you say that in general your health is: Excellent - 1, Very Good - 2, Good - 3, Fair - 4, Poor - 5, not sure -7, Refused - 9, blanks
+
+```{r}
+data$Gen_Hlth_good <- ifelse(data$General_health == 1, 1, 
+                             ifelse(data$General_health == 2, 1, 
+                             ifelse(data$General_health == 3, 1, 0)))
+data$Gen_Hlth_bad  <- ifelse(data$General_health == 4, 1, 
+                             ifelse(data$General_health == 5, 1, 0))
+data$Gen_Hlth_unkn <- ifelse(data$General_health == 7, 1, 
+                             ifelse(data$General_health == 9, 1, 0))
+
+summary(data[14:16])
+```
+
+Health_coverage - Do you have any kind of health care coverage? Yes - 1, No - 2, Not sure - 7, Refused - 9, blanks
+
+```{r}
+data$Insured <- ifelse(data$Health_coverage == 1, 1, 0) 
+data$Uninsured  <- ifelse(data$Health_coverage == 2, 1, 0) 
+data$Unkn_insurance <- ifelse(data$Health_coverage == 7, 1, 
+                             ifelse(data$Health_coverage == 9, 1, 0))
+
+summary(data[17:19])
+```
+
+Blood_pressure_high - Ever been told you have high blood pressure? Yes - 1, Yes pregnant - 2, No - 3, No borderline - 4, not sure - 7, Refused - 9, blanks
+
+```{r}
+data$BP_High <- ifelse(data$Blood_pressure_high == 1, 1, 
+                             ifelse(data$Blood_pressure_high == 2, 1, 
+                             ifelse(data$Blood_pressure_high == 4, 1, 0)))
+data$BP_normal  <- ifelse(data$Blood_pressure_high == 3, 1, 0)
+data$BP_unkn <- ifelse(data$Blood_pressure_high == 7, 1, 
+                             ifelse(data$Blood_pressure_high == 9, 1, 0))
+
+summary(data[20:22])
+```
+
+
+Cholesterol_high - Ever been told you have high cholestrol? Yes - 1, No - 2, not sure - 7, Refused - 9, blanks 
+
+```{r}
+data$Chol_High <- ifelse(data$Cholesterol_high == 1, 1, 0) 
+data$Chol_normal  <- ifelse(data$Cholesterol_high == 2, 1, 0) 
+data$Unkn_chol <- ifelse(data$Cholesterol_high == 7, 1, 
+                             ifelse(data$Cholesterol_high == 9, 1, 0))
+
+summary(data[23:25])
+```
+
+Coronary_heart_disease - Ever Diagnosed with Angina or Coronary Heart Disease? Yes - 1, No - 2, not sure - 7, Refused - 9, blanks
+
+```{r}
+data$HD_yes <- ifelse(data$Coronary_heart_disease == 1, 1, 0) 
+data$HD_no  <- ifelse(data$Coronary_heart_disease == 2, 1, 0) 
+data$Unkn_HD <- ifelse(data$Coronary_heart_disease == 7, 1, 
+                             ifelse(data$Coronary_heart_disease == 9, 1, 0))
+
+summary(data[26:28])
+```
+
+cancer - Ever diagnosed with cancer (non-skin)? Yes - 1, No - 2, Not sure - 7, Refused - 9, blanks
+
+```{r}
+data$cancer_yes <- ifelse(data$cancer == 1, 1, 0) 
+data$cancer_no  <- ifelse(data$cancer == 2, 1, 0) 
+data$Unkn_cancer <- ifelse(data$cancer == 7, 1, 
+                             ifelse(data$cancer == 9, 1, 0))
+
+summary(data[29:31])
+```
+
+Kidney_disease - Ever diagnosed with kidney disease? Yes - 1, No - 2, Not sure - 7, Refused - 9, blanks
+
+```{r}
+data$KD_yes <- ifelse(data$Kidney_disease == 1, 1, 0) 
+data$KD_no  <- ifelse(data$Kidney_disease == 2, 1, 0) 
+data$Unkn_KD <- ifelse(data$Kidney_disease == 7, 1, 
+                             ifelse(data$Kidney_disease == 9, 1, 0))
+
+summary(data[32:34])
+```
+
+Diabetes - Ever diagnosed with diabetes? Yes - 1, Yes pregnant - 2, No - 3, No prediabetes - 4, not sure - 7, Refused - 9, blanks
+
+```{r}
+data$Diabetes_yes <- ifelse(data$Diabetes == 1, 1, 
+                            ifelse(data$Diabetes == 2, 1, 
+                            ifelse(data$Diabetes == 4, 1, 0))) 
+data$Diabetes_no  <- ifelse(data$Diabetes == 3, 1, 0) 
+data$Unkn_Diabetes <- ifelse(data$Diabetes == 7, 1, 
+                             ifelse(data$Diabetes == 9, 1, 0))
+
+summary(data[35:37])
+```
+
+Smoke - Adults who are current smokers? No - 1, Yes - 2, not sure/Refused - 9, blanks
+
+```{r}
+data$Smoke_yes <- ifelse(data$Smoke == 1, 1, 0) 
+data$Smoke_no  <- ifelse(data$Smoke == 2, 1, 0) 
+data$Unkn_Smoke <- ifelse(data$Smoke == 9, 1, 0)
+
+summary(data[38:40])
+```
+
+Age - 18-80 with all values over 80 collapsed to 80.      
+For the age category, I breakdown each group in to 10 year groupings from 30 to 70. Note that the wieght factors in BRFSS are established to maintain the population profile for age vs US census data.  
+
+```{r}
+data$age_30minus <- ifelse(data$Age < 30, 1, 0) 
+data$age_30_40  <- ifelse(data$Age < 30, 0, ifelse(data$Age >= 40, 0, 1)) 
+data$age_40_50  <- ifelse(data$Age < 40, 0, ifelse(data$Age >= 50, 0, 1)) 
+data$age_50_60  <- ifelse(data$Age < 50, 0, ifelse(data$Age >= 60, 0, 1)) 
+data$age_60_70  <- ifelse(data$Age < 60, 0, ifelse(data$Age >= 70, 0, 1)) 
+data$age_70plus  <- ifelse(data$Age < 70, 0, 1) 
+summary(data[41:46])
+```
+
+I will aggregate the data as a proportion of population for each value by county (MMSA Region).
+
+```{r}
+#Each observation dummy value times it's weight factor.
+MMSA_Health <- data[14:46]*data$WT_Factor
+#Keep MMSA by each observation
+MMSA_Health$MMSA_Name <- data$MMSA_Number
+#Create total wt_factor for each MMSA
+MMSAWT <- aggregate(data$WT_Factor~data$MMSA_Number, FUN = sum)
+names(MMSAWT) <- c("MMSA_NAME", "WT_Factor")
+#Aggregate the health indicators by MMSA
+MMSAHealth <- aggregate(.~MMSA_Name, data = MMSA_Health, FUN = sum)
+#Divide out each of the total wt factors.
+MMSAHealth[2:34] <- MMSAHealth[2:34]/MMSAWT$WT_Factor
+summary(MMSAHealth)
+```
+
+Assuming that I did that all correctly, then the sum of the individual category columns for each MMSA should be 1 (i.e. 100%). This was a good review, because I found that I missed some values (3 and 4) in the Diabetes categories. 
+
+```{r}
+MMSA <- "10100"
+
+paste("General Health has", sum(MMSAHealth[2:4][MMSAHealth$MMSA_Name == MMSA,])*100, "% of data.")
+paste("Health coverage has", sum(MMSAHealth[5:7][MMSAHealth$MMSA_Name == MMSA,])*100, "% of data.")
+paste("Blood Pressure has", sum(MMSAHealth[8:10][MMSAHealth$MMSA_Name == MMSA,])*100, "% of data.")
+paste("Cholestrol has", sum(MMSAHealth[11:13][MMSAHealth$MMSA_Name == MMSA,])*100, "% of data.")
+paste("Heart Disease has", sum(MMSAHealth[14:16][MMSAHealth$MMSA_Name == MMSA,])*100, "% of data.")
+paste("Cancer has", sum(MMSAHealth[17:19][MMSAHealth$MMSA_Name == MMSA,])*100, "% of data.")
+paste("Kidney Disease has", sum(MMSAHealth[20:22][MMSAHealth$MMSA_Name == MMSA,])*100, "% of data.")
+paste("Diabetes has", sum(MMSAHealth[23:25][MMSAHealth$MMSA_Name == MMSA,])*100, "% of data.")
+paste("Smoke has", sum(MMSAHealth[26:28][MMSAHealth$MMSA_Name == MMSA,])*100, "% of data.")
+paste("Age has", sum(MMSAHealth[29:34][MMSAHealth$MMSA_Name == MMSA,])*100, "% of data.")
+```
+
+I reload the body mass index data and merge it with the other health indicators by MMSA number.
+
+```{r}
+BMIdata <- read.csv('healthdata3.csv')
+MMSAHealth <- merge(x = BMIdata, y = MMSAHealth, by.x ="MMSA", by.y = "MMSA_Name")
+summary(MMSAHealth)
+```
+
+I reload the covid data. I created a MMSA number vs name listing and merge that with the health data so that I can merge with the name listing of the covid data.
+
+```{r}
+coviddata <- read.csv('covid_MMSA.csv')
+MMSA <- subset(data, select = c("MMSA_NAME","MMSA_Number"))
+#summary(MMSA)
+MMSA_Health <- merge(x = MMSA[!duplicated(MMSA$MMSA_Number),], y = MMSAHealth, by.x ="MMSA_Number", by.y = "MMSA")
+MMSA_Health <- merge(x = coviddata, y = MMSA_Health, by ="MMSA_NAME")
+summary(MMSA_Health)
+```
+
+This is the complete data set for analysis and modeling with and without covid data.
+
+```{r}
+write.csv(MMSA_Health, 'healthcoviddata.csv', row.names = FALSE)
+write.csv(MMSAHealth, 'healthindicatordata.csv', row.names = FALSE)
+
+```
+
+
+
+
+References: 
+
+Unknown. (2017) Smart: City and county survey data: 2017 Data. Center for Disease Control and Prevention: Behavioral risk factor surveillance system. Retrieved November 1, 2020 from: https://www.cdc.gov/brfss/smart/Smart_data.htm
+
+Unknown. (2020b). Coronavirus disease 2019 (COVID-19): People with certain medical conditions. Centers for Disease Control and Prevention. Retrieved from:  https://www.cdc.gov/coronavirus/2019-ncov/need-extra-precautions/people-with-medical-conditions.html?CDC_AA_refVal=https%3A%2F%2Fwww.cdc.gov%2Fcoronavirus%2F2019-ncov%2Fneed-extra-precautions%2Fgroups-at-higher-risk.html
+
+
+
+
