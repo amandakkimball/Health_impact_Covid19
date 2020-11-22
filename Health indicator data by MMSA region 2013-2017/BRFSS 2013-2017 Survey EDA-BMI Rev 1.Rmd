@@ -1,0 +1,158 @@
+---
+title: "BRFSS 2013-2017 Survey EDA-BMI"
+author: "Amanda Kimball"
+date: "11/19/2020"
+output:
+  html_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+The Smart: City and county survey data put together by the Center for Disease Control and Prevention: Behavioral risk factor surveillance system (Smart data, 2013-2017). Contains a number of survey response data that is equally distributed across a range of areas referred to as Metropolitan and Micropolitan statistical areas. The survey data covers health indicators, diet choices, health insurance availability, demographics, and economic factors. I initially uploaded the data and pulled out the data related to body mass index and age demographics. I evaluated using 5 years of data in order to increase the number of regions in my analysis. I ended up using only the 2017 analysis becuase adding the 5 years removes important variables high blood pressure and high cholesterol but am saving the analysis for future reference.
+
+```{r}
+library(foreign)
+BRFSS2017 <- read.xport("MMSA2017.XPT")
+BRFSS2016 <- read.xport("MMSA2016.XPT")
+BRFSS2015 <- read.xport("MMSA2015.XPT")
+BRFSS2014 <- read.xport("MMSA2014.XPT")
+BRFSS2013 <- read.xport("MMSA2013.XPT")
+```
+
+I identified the variables needed for the analysis as indicated 'vars' below. Then subset each of the imported files by those factors. 
+
+```{r}
+#data <- subset(BRFSS2017, select = c(47:49, 122:129, 174, 175, 177))
+
+vars <- c("PREGNANT", "X_BMI5", "X_BMI5CAT", "X_RFBMI5", "X_AGE80", "X_MMSA", "X_MMSAWT", "MMSANAME") 
+
+data17 <- subset(BRFSS2017, select = vars)
+data16 <- subset(BRFSS2016, select = vars)
+data15 <- subset(BRFSS2015, select = vars)
+data14 <- subset(BRFSS2014, select = vars)
+data13 <- subset(BRFSS2013, select = vars)
+
+data <- rbind(data13, data14, data15, data16, data17)
+
+#data$County <- gsub(", Metropolitan Statistical Area", "", data$County)
+#data$County <- gsub(", Micropolitan Statistical Area", "", data$County)
+#data$County <- gsub(", Metropolitan Division", "", data$County)
+#data$State <- gsub(".*,", "", data$County)
+#data$State <- gsub(" ", "", data$State)
+#data$County <- gsub(",.*", "", data$County)
+str(data)
+```
+
+Here are the counties. I use this listing to compare this data to other data sources for specifics on MMSA name alignment.
+
+
+I am focusing on adults 18 and older for the analysis and will eliminate all younger participants which are not included in the BRFSS data, so I remove the younger participants.
+
+```{r}
+data <- data[(data$X_AGE80 >= 18),]
+summary(data$X_AGE80)
+```
+
+Here are the calculated body mass indicator variables. As shown there are several missing values.
+
+```{r}
+summary(data)
+```
+
+There are a significant number of NA's for the BMI index. I am going to focus on one county's data to understand the nuances in the data set and then apply what I have learned to the other counties. Albuquerque is in all five data sets. I can safely remove the individuals listed as pregnant as outliers with a cause. It appears that the remaining values are missing the weight or height factor either listed as 9999 (Refused) or 7777 (Not sure).
+
+```{r}
+Albuquerque <- data[data$X_MMSA == 10740,]
+summary(Albuquerque)
+```
+
+I calculated the average for the Albuquerque and compared it with the average for the entire data sample and find that they are within 0.2 kg/m2 difference. The weight factor 'X_MMSAWT' is used to adjust for sampling methodology. Note that the documentation indicates a 2 decimal place value in the 4 digit value, so i divide by 100. Based off this analysis, I am going to impute the average for the population as the NAs.
+```{r}
+Albuquerqueavg <- mean((Albuquerque$X_BMI5*Albuquerque$X_MMSAWT),na.rm=TRUE)/
+  mean(Albuquerque$X_MMSAWT,na.rm=TRUE)
+popavg <- mean((data$X_BMI5*data$X_MMSAWT), na.rm=TRUE)/mean(data$X_MMSAWT,na.rm=TRUE)
+paste("Average BMI in population is", round(popavg/100, 1), "and average BMI for Albuquerque is",
+  round(Albuquerqueavg/100, 1), ".")
+```
+
+As indicated during the Aberdeen review - pregnant individuals can be removed as outliers outside the range of this analysis. The NAs in that column are the male subjects and will be included in the analysis. The average BMI will be added otherwise. The BMI average is 27.9 so the BMI5CAT variable is over weight = 3 and the RFBMI5 is over 25 = 2. 
+
+```{r}
+data <- subset(data, (PREGNANT != 1) | is.na(PREGNANT))
+index <- is.na(data$X_BMI5)
+data$X_BMI5[index] <- popavg
+data$X_BMI5CAT[index] <- 3
+data$X_RFBMI5[index] <- 2
+summary(data)
+```
+
+I plot a histogram of the data and find that most of the data sits in the 25-30 kg/m2 range. The ~90k that I added did not significantly change the data structure.
+
+```{r}
+hist(data$X_BMI5/100, xlab = "BMI (kg/m2)", breaks = 20)
+```
+
+The distribution of BMI does not correlate with age.
+
+```{r}
+plot(data$X_AGE80, data$X_BMI5/100, ylab = "BMI (kg/m2)", xlab = "Age (yrs)", lwd = 10, col = "grey60")
+```
+
+Extreme Obesity is defined as over 40 kg/m2 but was not segregated in the original data set. I will add that level to the data for the visualizations and gives another level of detail towards poor health conditions.
+
+```{r}
+data$X_BMI5CAT[data$X_BMI5 > 4000] <- 5
+summary(data)
+```
+
+I will aggregate the data as an average BMI by county (MMSA Region).
+
+```{r}
+MMSAWT <- aggregate(data$X_MMSAWT~data$X_MMSA, FUN = mean)
+MMSABMI <- aggregate(data$X_BMI5*data$X_MMSAWT/100~data$X_MMSA, FUN = mean)
+names(MMSABMI) <- c("MMSA", "BMI_(kg/m2)")
+MMSABMI$'BMI_(kg/m2)' <- MMSABMI$'BMI_(kg/m2)'/MMSAWT$`data$X_MMSAWT`
+summary(MMSABMI)
+```
+
+Then I will create 4 proportion (percentage) values for portion of population underweight, Normal weight, Overweight, Obese, and extreme obesity by region.
+
+```{r}
+data$underweight <- ifelse(data$X_BMI5CAT == 1, 1, 0)
+data$normalweight <- ifelse(data$X_BMI5CAT == 2, 1, 0)
+data$overweight <- ifelse(data$X_BMI5CAT == 3, 1, 0)
+data$obese <- ifelse(data$X_BMI5CAT == 4, 1, 0)
+data$extremeobesity <- ifelse(data$X_BMI5CAT == 5, 1, 0)
+
+#Each observation dummy value times it's weight factor.
+MMSA_BMI <- data[c("underweight", "normalweight", "overweight", "obese", "extremeobesity")]*data$X_MMSAWT
+#Keep MMSA by each observation
+MMSA_BMI$MMSA_Name <- data$X_MMSA
+#Create total wt_factor for each MMSA
+MMSAWT <- aggregate(data$X_MMSAWT~data$X_MMSA, FUN = sum)
+names(MMSAWT) <- c("MMSA_NAME", "WT_Factor")
+#Aggregate the health indicators by MMSA
+MMSA_BMI <- aggregate(.~MMSA_Name, data = MMSA_BMI, FUN = sum)
+#Divide out each of the total wt factors.
+MMSABMI[3:7] <- MMSA_BMI[2:6]/MMSAWT$WT_Factor
+summary(MMSABMI)
+```
+
+Check to see if they add up to 100% of values for 1 region: Albuquerque, NM was in all 5 years.
+
+```{r}
+paste("BMI has", sum(MMSABMI[3:7][MMSABMI == 10740,])*100, "% of data.")
+```
+
+I export this data so that I can create GEO Map data visualizations of the health indicators in Tableau.
+
+```{r}
+write.csv(MMSABMI, 'healthdata4.csv', row.names = FALSE)
+```
+
+References: 
+
+Unknown. (2017) Smart: City and county survey data: 2017 Data. Center for Disease Control and Prevention: Behavioral risk factor surveillance system. Retrieved November 1, 2020 from: https://www.cdc.gov/brfss/smart/Smart_data.htm
