@@ -1,10 +1,10 @@
 ---
 title: "Covid19 vs US county to MMSA"
 author: "Amanda Kimball"
-date: "11/3/2020"
+date: "11/22/2020"
 output:
-  word_document: default
   html_document: default
+  word_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -24,8 +24,8 @@ str(covid19cases[1:5])
 I review to see if any of the values are N/A and find the data set fully intact.This was expected since it was downloaded from the CDC's visualization page.
 
 ```{r}
-covid19deaths[is.na(covid19deaths),]
-covid19cases[is.na(covid19cases),]
+nrow(covid19deaths[is.na(covid19deaths),])
+nrow(covid19cases[is.na(covid19cases),])
 ```
 
 I will create a data frame with all of the necessary attributes from the 2 data sets. I choose to select the last day in September 2020 for the analysis, so that most of the death data is fully updated. This avoids most of the delay associated with the collection of death certificate data. 
@@ -44,8 +44,7 @@ I downloaded the delineation data from US Census Bureau (2020) to obtain a cross
 
 ```{r}
 county_MMSA <- read.csv("County to MMSA list1_2020.csv", stringsAsFactors = FALSE)
-names(county_MMSA) <- c("MMSA_State", "County", "State", "ST_FIPS", "County_FIPS", "Central_Outlying")
-county_MMSA$MMSA <- gsub(",.*","", county_MMSA$MMSA_State)
+names(county_MMSA) <- c("MMSA", "County", "State", "ST_FIPS", "County_FIPS", "Central_Outlying")
 str(county_MMSA)
 ```
 
@@ -63,7 +62,7 @@ covid_location <- merge(covid19, county_MMSA, all.x = TRUE, by = c("County","ST_
 summary(covid_location)
 ```
 
-The counts remain the same after the merge, but there are some N/As in the dataset.
+The counts remain the same after the merge, but there are some N/As in the data set.
 
 ```{r}
 sum(covid_location$Cases)
@@ -72,7 +71,8 @@ sum(covid_location$Deaths)
 There are 1377 counties which are not included in the MMSA units and will be removed from my listing. These will not align with the data from the BFRSS dataset and can not be used for this analysis. They will be removed during the location aggregation that I perform next. 
 
 ```{r}
-covid_location[is.na(covid_location$County_FIPS),]
+nrow(covid_location[is.na(covid_location$County_FIPS),])
+sum(covid_location[is.na(covid_location$County_FIPS),"Cases"])
 ```
 
 The aggregation functions will sum the covid cases and deaths by location, then merge them back together by MMSA region. 
@@ -97,13 +97,13 @@ I calculate the death_rate as deaths per cases in the region.
 ```{r}
 covid_data <- covid_data[covid_data$CASES>0,] #otherwise the death rate blows up due to divide by 0.
 covid_data$death_rate <- 100*covid_data$DEATHS/covid_data$CASES
-summary(covid_data)
+str(covid_data)
 ```
 
-I will export the data so that I can create GIS Maps in Tableau. 
+I will export the data so that I can create GIS Maps in Tableau and merge this data with BRFSS data in subsequent reports. 
 
 ```{r}
-write.csv(covid_data, 'covid_MMSA.csv')
+write.csv(covid_data, 'covid_MMSA.csv', row.names = FALSE)
 ```
 
 References:
