@@ -18,7 +18,7 @@ The initial code to review, compile, aggregate by metropolitan area, and merge h
     <script type="text/javascript">
         function initViz() {
             var containerDiv = document.getElementById("viz1607286138420"),
-                url = "http://public.tableau.com/views/RegionalhealthimpactonCovid19severityoutcome/HealthIndicatorsvsCovidOutcomeseverity",
+                url = "https://public.tableau.com/views/RegionalhealthimpactonCovid19severityoutcome/HealthIndicatorsvsCovidOutcomeseverity?:language=en&:display_count=y&publish=yes&:origin=viz_share_link",
                 options = {
                     hideTabs: true,
                     onFirstInteractive: function () {
