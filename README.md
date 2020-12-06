@@ -8,15 +8,28 @@ The initial code to [review, compile, aggregate health data by metropolitan area
 
 # Exploratory Data Analysis
 
-The data was further described via a set of visualizations that can be viewed on Tableau Public:
+The data was further described via a set of visualizations that can be viewed on [Tableau Public]:(https://public.tableau.com/views/RegionalhealthimpactonCovid19severityoutcome/HealthIndicatorsvsCovidOutcomeseverity?:language=en&:display_count=y&publish=yes&:origin=viz_share_link)
+<div class='tableauPlaceholder' id='viz1607286138420' style='position: relative'><noscript><a href='#'><img alt=' ' src='https:&#47;&#47;public.tableau.com&#47;static&#47;images&#47;Re&#47;RegionalhealthimpactonCovid19severityoutcome&#47;HealthIndicatorsvsCovidOutcomeseverity&#47;1_rss.png' style='border: none' /></a></noscript><object class='tableauViz'  style='display:none;'><param name='host_url' value='https%3A%2F%2Fpublic.tableau.com%2F' /> <param name='embed_code_version' value='3' /> <param name='site_root' value='' /><param name='name' value='RegionalhealthimpactonCovid19severityoutcome&#47;HealthIndicatorsvsCovidOutcomeseverity' /><param name='tabs' value='yes' /><param name='toolbar' value='yes' /><param name='static_image' value='https:&#47;&#47;public.tableau.com&#47;static&#47;images&#47;Re&#47;RegionalhealthimpactonCovid19severityoutcome&#47;HealthIndicatorsvsCovidOutcomeseverity&#47;1.png' /> <param name='animate_transition' value='yes' /><param name='display_static_image' value='yes' /><param name='display_spinner' value='yes' /><param name='display_overlay' value='yes' /><param name='display_count' value='yes' /><param name='language' value='en' /><param name='filter' value='publish=yes' /></object></div>
 
-<a href="https://public.tableau.com/views/RegionalhealthimpactonCovid19severityoutcome/HealthIndicatorsvsCovidOutcomeseverity?:language=en&:display_count=y&publish=yes&:origin=viz_share_link" target ="_blank" <div class='tableauPlaceholder' id='viz1607286138420' style='position: relative'><noscript><a href='#'><img alt=' ' src='https:&#47;&#47;public.tableau.com&#47;static&#47;images&#47;Re&#47;RegionalhealthimpactonCovid19severityoutcome&#47;HealthIndicatorsvsCovidOutcomeseverity&#47;1_rss.png' style='border: none' /></a></noscript><object class='tableauViz'  style='display:none;'><param name='host_url' value='https%3A%2F%2Fpublic.tableau.com%2F' /> <param name='embed_code_version' value='3' /> <param name='site_root' value='' /><param name='name' value='RegionalhealthimpactonCovid19severityoutcome&#47;HealthIndicatorsvsCovidOutcomeseverity' /><param name='tabs' value='yes' /><param name='toolbar' value='yes' /><param name='static_image' value='https:&#47;&#47;public.tableau.com&#47;static&#47;images&#47;Re&#47;RegionalhealthimpactonCovid19severityoutcome&#47;HealthIndicatorsvsCovidOutcomeseverity&#47;1.png' /> <param name='animate_transition' value='yes' /><param name='display_static_image' value='yes' /><param name='display_spinner' value='yes' /><param name='display_overlay' value='yes' /><param name='display_count' value='yes' /><param name='language' value='en' /><param name='filter' value='publish=yes' /></object></div></a>
 
-We can see variation overlap in the age category and weight categories, as expected. Age: There is a positive correlation with the high age categories vs the health indicators and negative correlation with the young age categories. Note the high correlation with age 50-60 with regards to covid19 severity 'death_rate', this will prove important in the models.
+<a href="https://public.tableau.com/views/RegionalhealthimpactonCovid19severityoutcome/HealthIndicatorsvsCovidOutcomeseverity?:language=en&:display_count=y&publish=yes&:origin=viz_share_link
+" target="_blank"><img src='https:&#47;&#47;public.tableau.com&#47;static&#47;images&#47;Re&#47;RegionalhealthimpactonCovid19severityoutcome&#47;HealthIndicatorsvsCovidOutcomeseverity&#47;1_rss.png' 
+alt="IMAGE ALT TEXT HERE"/></a>
+
+
+
+
+
+
+
+
+
+
+The initial review of the data used a correlation matrix. We can see variation overlap in the age category and weight categories, as expected. Age: There is a positive correlation with the high age categories vs the health indicators and negative correlation with the young age categories. Note the high correlation with age 50-60 with regards to covid19 severity 'death_rate', this will prove important in the models.
 
 Health: The health indicators general health bad, cholesterol high, diabetes, heart disease, and to some extent kidney disease are all positively correlated. Surprisingly the smoking population is negatively correlated to the other health indicators. The uninsured regions value being negatively correlated with death rate is also important in the models.
 
-![Correlation Matrix](/images/Correlation matrix.jpg)
+![Correlation Matrix](/images/correlation%20matrix.jpg)
 
 Based on this plot, I expect to see age 50-60, normal weight, uninsured, and cholesterol high as important variables in the models.
 
