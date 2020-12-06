@@ -8,7 +8,35 @@ The initial code to review, compile, aggregate by metropolitan area, and merge h
 
 ![Correlation Matrix](/images/Correlation_plot.jpg)
 
-<div class='tableauPlaceholder' id='viz1607285117451' style='position: relative'><noscript><a href='#'><img alt=' ' src='https:&#47;&#47;public.tableau.com&#47;static&#47;images&#47;Re&#47;RegionalhealthimpactonCovid19severityoutcome&#47;USCovid-cases&#47;1_rss.png' style='border: none' /></a></noscript><object class='tableauViz'  style='display:none;'><param name='host_url' value='https%3A%2F%2Fpublic.tableau.com%2F' /> <param name='embed_code_version' value='3' /> <param name='site_root' value='' /><param name='name' value='RegionalhealthimpactonCovid19severityoutcome&#47;USCovid-cases' /><param name='tabs' value='yes' /><param name='toolbar' value='yes' /><param name='static_image' value='https:&#47;&#47;public.tableau.com&#47;static&#47;images&#47;Re&#47;RegionalhealthimpactonCovid19severityoutcome&#47;USCovid-cases&#47;1.png' /> <param name='animate_transition' value='yes' /><param name='display_static_image' value='yes' /><param name='display_spinner' value='yes' /><param name='display_overlay' value='yes' /><param name='display_count' value='yes' /><param name='language' value='en' /><param name='filter' value='publish=yes' /></object></div>                <script type='text/javascript'>                    var divElement = document.getElementById('viz1607285117451');                    var vizElement = divElement.getElementsByTagName('object')[0];                    if ( divElement.offsetWidth > 800 ) { vizElement.style.minWidth='800px';vizElement.style.maxWidth='100%';vizElement.style.minHeight='650px';vizElement.style.maxHeight=(divElement.offsetWidth*0.75)+'px';} else if ( divElement.offsetWidth > 500 ) { vizElement.style.minWidth='800px';vizElement.style.maxWidth='100%';vizElement.style.minHeight='650px';vizElement.style.maxHeight=(divElement.offsetWidth*0.75)+'px';} else { vizElement.style.width='100%';vizElement.style.minHeight='1800px';vizElement.style.maxHeight=(divElement.offsetWidth*1.77)+'px';}                     var scriptElement = document.createElement('script');                    scriptElement.src = 'https://public.tableau.com/javascripts/api/viz_v1.js';                    vizElement.parentNode.insertBefore(scriptElement, vizElement);                </script>
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Basic Embed</title>
+    
+    <script type="text/javascript" src="https://public.tableau.com/javascripts/api/tableau-2.min.js"></script>
+    <script type="text/javascript">
+        function initViz() {
+            var containerDiv = document.getElementById("vizContainer"),
+                url = "http://public.tableau.com/views/RegionalhealthimpactonCovid19severityoutcome/HealthIndicatorsvsCovidOutcomeseverity",
+                options = {
+                    hideTabs: true,
+                    onFirstInteractive: function () {
+                        console.log("Run this code when the viz has finished loading.");
+                    }
+                };
+            
+            // Create a viz object and embed it in the container div.
+            var viz = new tableau.Viz(containerDiv, url, options); 
+        }
+    </script>
+</head>
+
+<body onload="initViz();">
+    <div id="vizContainer" style="width:800px; height:700px;"></div>    
+</body>
+
+</html>
 
 # References
 
