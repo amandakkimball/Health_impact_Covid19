@@ -1,0 +1,86 @@
+---
+title: "Mapping Covid and other health indicators by CBSA"
+author: "Amanda Kimball"
+date: "11/28/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(rgdal)
+library(broom)
+library(ggplot2)
+```
+
+
+```{r}
+csba_shp <- readOGR("tl_2019_us_cbsa.shp", verbose = FALSE)
+population19 <- read.csv("cbsa-met-est2019-annres.csv", header = TRUE, col.names = c("id","population"), stringsAsFactors = FALSE)
+population19$id <- gsub("\\.", "", population19$id)
+population19$id <- gsub(" Metro Area", "", population19$id) 
+population19$id <- gsub(" Metro Division", "", population19$id)
+population19$id <- gsub(" Metropolitan Statistical Area", "", population19$id)
+population19$population <- gsub(",", "", population19$population)
+population19$population <- as.numeric(population19$population)
+
+str(population19)
+```
+
+```{r}
+csba_landares <- as.data.frame(as.numeric(as.character(csba_shp$ALAND))/2589988)
+csba_landares$id <- (csba_shp$NAME)
+names(csba_landares) <- c("land_area", "id")
+
+str(csba_landares)
+csba_df <- tidy(csba_shp, region = "NAME")
+str(csba_df)
+```
+```{r}
+landarea <- merge(csba_landares, csba_df, by = "id")
+land_pop <- merge(landarea,population19, by = "id")
+popdensity <- land_pop[complete.cases(land_pop),] #This makes it a left join.
+popdensity$popdensity <- popdensity$population/popdensity$land_area
+summary(popdensity)
+```
+
+
+```{r}
+states <- map_data("county")
+
+ggplot() + theme_void() +
+  geom_polygon(data = states, aes(x = long, y = lat, group = group), fill = "white", color = "grey50", size = 0.2)+
+  geom_polygon(data = landarea, aes(x = long, y = lat, group = group, 
+                                    fill = land_area)) +
+  scale_fill_continuous(name = "Land area [Sq Mile]",
+                        low = "white", high = "Blue", na.value = "white") +
+  labs(title = "Land area of CSBA regions in the US")
+  
+  
+```
+
+```{r}
+csba_popdensity <- aggregate(popdensity$popdensity~popdensity$id, FUN = mean)
+names(csba_popdensity) <- c("id","pop_density")
+summary(csba_popdensity)
+```
+
+```{r}
+head(csba_popdensity[order(-csba_popdensity$pop_density),])
+head(csba_popdensity[order(csba_popdensity$pop_density),])
+```
+
+
+
+
+```{r}
+write.csv(csba_popdensity, 'pop_density.csv', row.names = FALSE)
+```
+
+
+
+
+
+

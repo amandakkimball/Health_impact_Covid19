@@ -1,14 +1,40 @@
 # Project to predict Covid19 severity from the known health indicator data within a community
 
-This project utilizes the information from the Center for Disease Controls Behavioral risk factor surveillance system (BRFSS, 2011-2017) to determine if Covid19 severity within a community can be predicted from known health indicators. 
+This project utilizes the information from the Center for Disease Controls Behavioral risk factor surveillance system [(BRFSS, 2011-2017)](https://www.cdc.gov/brfss/smart/Smart_data.htm) to determine if Covid19 severity within a community can be predicted from known health indicators. 
 
-**This is a work in progress.** 
+# Dataset compilation
 
-The initial code to review, compile, aggregate by metropolitan area, and merge have been uploaded. Here is the correlation plot for that data, as a teaser.
+The initial code to [review, compile, aggregate health data by metropolitan area](https://github.com/amandakkimball/Health_impact_Covid19/blob/main/Health%20indicator%20data%20by%20MMSA%20region), and [review, compile and merge covid19 data](https://github.com/amandakkimball/Health_impact_Covid19)have been uploaded. 
 
-![Correlation Matrix](/images/Correlation_plot.jpg)
+# Exploratory Data Analysis
 
-<div class='tableauPlaceholder' id='viz1607287359351' style='position: relative'><noscript><a href='#'><img alt=' ' src='https:&#47;&#47;public.tableau.com&#47;static&#47;images&#47;Re&#47;RegionalhealthimpactonCovid19severityoutcome&#47;USHealth&#47;1_rss.png' style='border: none' /></a></noscript><object class='tableauViz'  style='display:none;'><param name='host_url' value='https%3A%2F%2Fpublic.tableau.com%2F' /> <param name='embed_code_version' value='3' /> <param name='site_root' value='' /><param name='name' value='RegionalhealthimpactonCovid19severityoutcome&#47;USHealth' /><param name='tabs' value='yes' /><param name='toolbar' value='yes' /><param name='static_image' value='https:&#47;&#47;public.tableau.com&#47;static&#47;images&#47;Re&#47;RegionalhealthimpactonCovid19severityoutcome&#47;USHealth&#47;1.png' /> <param name='animate_transition' value='yes' /><param name='display_static_image' value='yes' /><param name='display_spinner' value='yes' /><param name='display_overlay' value='yes' /><param name='display_count' value='yes' /><param name='language' value='en' /><param name='filter' value='publish=yes' /></object></div>
+The data was further described via a set of visualizations that can be viewed on Tableau Public:
+
+[<div class='tableauPlaceholder' id='viz1607286138420' style='position: relative'><noscript><a href='#'><img alt=' ' src='https:&#47;&#47;public.tableau.com&#47;static&#47;images&#47;Re&#47;RegionalhealthimpactonCovid19severityoutcome&#47;HealthIndicatorsvsCovidOutcomeseverity&#47;1_rss.png' style='border: none' /></a></noscript><object class='tableauViz'  style='display:none;'><param name='host_url' value='https%3A%2F%2Fpublic.tableau.com%2F' /> <param name='embed_code_version' value='3' /> <param name='site_root' value='' /><param name='name' value='RegionalhealthimpactonCovid19severityoutcome&#47;HealthIndicatorsvsCovidOutcomeseverity' /><param name='tabs' value='yes' /><param name='toolbar' value='yes' /><param name='static_image' value='https:&#47;&#47;public.tableau.com&#47;static&#47;images&#47;Re&#47;RegionalhealthimpactonCovid19severityoutcome&#47;HealthIndicatorsvsCovidOutcomeseverity&#47;1.png' /> <param name='animate_transition' value='yes' /><param name='display_static_image' value='yes' /><param name='display_spinner' value='yes' /><param name='display_overlay' value='yes' /><param name='display_count' value='yes' /><param name='language' value='en' /><param name='filter' value='publish=yes' /></object></div>](https://public.tableau.com/views/RegionalhealthimpactonCovid19severityoutcome/HealthIndicatorsvsCovidOutcomeseverity?:language=en&:display_count=y&publish=yes&:origin=viz_share_link)
+
+We can see variation overlap in the age category and weight categories, as expected. Age: There is a positive correlation with the high age categories vs the health indicators and negative correlation with the young age categories. Note the high correlation with age 50-60 with regards to covid19 severity 'death_rate', this will prove important in the models.
+
+Health: The health indicators general health bad, cholesterol high, diabetes, heart disease, and to some extent kidney disease are all positively correlated. Surprisingly the smoking population is negatively correlated to the other health indicators. The uninsured regions value being negatively correlated with death rate is also important in the models.
+
+![Correlation Matrix](/images/Correlation matrix.jpg)
+
+Based on this plot, I expect to see age 50-60, normal weight, uninsured, and cholesterol high as important variables in the models.
+
+# Predictive Modeling
+
+Creating a decision tree model with the BRFSS data and using covid19 statistics for each of the regions the most important variables were determined. For the categorical model categories are defined as follows (basis is quartiles of the covid19 death rates):
+severe > 2.74%
+medium > 1.90%
+medium_high > 1.37%
+lowest <= 1.37%
+
+To decrease multi-collinearlity in the model only 1 weight characteristic and only 1 age characteristic was used. Overweight and age 50-60 were determined to have the highest importance.  Overweight is shown as more important than normal weight using variable importance for decision tree models.
+
+![rparttree2](/images/rparttree2.jpg)![rparttree](/images/rparttree.jpg)
+
+# Future Research
+
+Further analysis will be to see how this data and model compare to recent covid19 outbreaks. Stay tuned for that analysis at the start of next year.
 
 # References
 

@@ -1,0 +1,371 @@
+---
+title: "Covid vs MMSA Region health evaluation"
+author: "Amanda Kimball"
+date: "11/22/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+Health_covid_data <- read.csv("healthcoviddata.csv", stringsAsFactors = FALSE)
+census_popdensity <- read.csv("pop_density.csv", stringsAsFactors = FALSE)
+```
+
+I am going to remove all of the regions with less than 500 Covid19 cases since evaluation of outcomes is difficult to interpret with a small qty of cases. This leaves me with 81 Regions. 
+
+```{r}
+data <- Health_covid_data[Health_covid_data$CASES > 0,c(1:4, 6:11, 13, 16, 18, 21, 24, 27, 30, 33, 36, 39:44)]
+data <- Health_covid_data[Health_covid_data$DEATHS > 0,c(1:4, 6:11, 13, 16, 18, 21, 24, 27, 30, 33, 36, 39:44)]
+data <- merge(data, census_popdensity, by.x = "MMSA_NAME", by.y = "id")
+summary(data)
+```
+
+```{r}
+head(data[order(-data$CASES),])
+head(data[order(data$CASES),])
+head(data[order(-data$death_rate),])
+head(data[order(data$death_rate),])
+```
+
+
+```{r}
+pairs(data[c(2:4,5:10)])
+pairs(data[c(2:4,11:19)])
+pairs(data[c(2:4,20:26)])
+```
+
+```{r}
+library(DataExplorer)
+plot_intro(data)
+```
+
+The correlation plot gives me 2 things to evaluate for my dataset. One is that some of my variables are overlapping in content, so I could eliminate variables with overlap to improve accuracy in a future model. 2 datasets pop out immediately the age category is highly correlated with young being highly negatively correlated with the high age groups and the high age groups being positively correlated with the high high age groups. The BMI index is positively correlated with the extreme obesity and negatively correlated with the normal weight values. 
+
+There is a positive correlation with the high age categories vs the health indicators and negative correlation with the young age categories. The health indicators general health bad, cholesterol high, diabetes, heart disease, and to some extent kidney disease are all positively correlated. Surprisingly the smoking proportion within regions is negatively correlated to the other health indicators. High blood pressure is highly correlated with BMI, Bad general health, high cholestrol, heart disease, kidney disease, and diabetes.
+
+The second thing it gives is a precursor to variable importance for modeling in this case the death rate. Surprising to me is the uninsured regions value being negatively correlated with death rate. That could prove interesting in the models. death rate is positively correlated with proportion of individuals between 50-60 years (and to some extent older) within a region and negatively correlated with the proportion of individuals under 40 within regions. Based on this plot, I expect to see age 50-60, age 30-40, normal weight, uninsured, cholesterol high, age 60-70 and age 70 plus as important variables in the models.
+
+I added population density which has been shown to correlate with both cases and deaths (as clearly seen in the correlation matrix below). How does population density correlate with severity of covid19? It appears to positively correlate which could be because there are less resources given the high case loads, or higher viral load for longer contact between COVID19 contagion. Regardless of the why, it has a higher correlation than that of older age. 
+
+```{r}
+plot_correlation(data[2:26])
+```
+```{r}
+plot_correlation(data[c(4,6:12,14:26)])
+```
+```{r}
+jpeg(filename = "correlation matrix.jpg")
+plot_correlation(data[c(4,6:12,14:26)])
+dev.off()
+```
+
+
+Here are the histograms. We see that LA county is the high value for many of the factors, but nothing that is a true outlier with a cause.
+
+```{r}
+plot_histogram(data[c(2:4,26)])
+plot_histogram(data[c(11:19)], nrow = 3, ncol = 3)
+plot_histogram(data[c(5:10, 20:25)])
+```
+
+
+```{r}
+plot_qq(data, by = 'death_rate')
+
+```
+
+I split the data into severity categories for modeling. The highest quartile is above 2.74, median value is 1.9, and lowest quartile is less than 1.37. This will give me roughly the same number of values in each of my categories.
+
+```{r}
+data$Severity <- factor(ifelse(data$death_rate > 2.74, "Severe",
+                        ifelse(data$death_rate > 1.90, "medium-high", 
+                               ifelse(data$death_rate > 1.37, "medium", "lowest")))) 
+summary(data)
+```
+
+
+I'll subset the variables for modeling. Eliminating cases, deaths, BMI average, and high blood pressure. All of my data is standardized as a percentage of the population except the population density data. Therefore, I will standardize that column.
+
+```{r}
+data2 <- data[c(4,6:12,14:27)]
+data2$pop_density <- (data2$pop_density - min(data2$pop_density))/(max(data2$pop_density)-min(data2$pop_density))
+```
+
+
+
+```{r}
+set.seed(1234)
+index <- sample(length(data2[,1]), length(data2[,1])*.7)
+
+train_datac <- data2[index,2:21]
+train_labelsc <- data2[index, 22]
+train_datacl <- data2[index,2:22]
+test_datac <- data2[-index,2:21]
+test_labelsc <- data2[-index,22]
+summary(train_datac)
+summary(train_labelsc)
+summary(test_labelsc)
+```
+
+
+```{r}
+library(class)
+library(caret)
+test_pred <- knn(train_datac, test_datac, train_labelsc, k = 3, prob = TRUE)
+confusionMatrix(test_pred, test_labelsc)
+```
+
+```{r}
+library(C50)
+
+control <- C5.0Control(
+  subset = TRUE,
+  bands = 0,
+  winnow = FALSE,
+  noGlobalPruning = TRUE,
+  CF = .5,
+  minCases = 2,
+  fuzzyThreshold = FALSE,
+  sample = 0,
+  seed = sample.int(4096, size = 1) - 1L,
+  earlyStopping = FALSE,
+  label = "outcome"
+)
+```
+```{r}
+tree_model <- C5.0(train_datac, train_labelsc, control = control, trials = 1)
+
+tree_model
+summary(tree_model)
+
+```
+
+```{r}
+pred_tree <- predict(tree_model, test_datac)
+confusionMatrix(pred_tree, test_labelsc)
+```
+
+```{r}
+plot(tree_model)
+```
+```{r}
+plot(tree_model, subtree = 2)
+```
+```{r}
+plot(tree_model, subtree = 21)
+```
+
+```{r}
+library(rpart)
+library(rpart.plot) 
+
+control <- rpart.control(minsplit = 20, cp = 0.001, 
+              maxcompete = 4, maxsurrogate = 5, usesurrogate = 0, xval = 10,
+              surrogatestyle = 0, maxdepth = 30)
+
+treeformula <- Severity~
+  Uninsured +
+  age_50_60 +
+  overweight +
+  #HD_yes +
+  #cancer_yes
+  Chol_High
+  ##Diabetes_yes +
+  ##Gen_Hlth_bad +
+  ##extremeobesity# +
+  ##obese +
+  ##underweight# +
+  #normalweight
+  #pop_density 
+tree_model2 <- rpart(treeformula, train_datacl,control = control)
+
+tree_model2$call
+tree_model2$variable.importance
+tree_model2$cptable
+
+```
+
+```{r}
+pred_tree2 <- predict(tree_model2, test_datac, type = "class")
+confusionMatrix(pred_tree2, test_labelsc)
+```
+
+```{r}
+jpeg(filename = "rparttree.jpg")
+rpart.plot(tree_model2)
+#dev.print(jpg, 'rparttree.jpg')
+dev.off()
+```
+
+Now to see if I can model the severity of covid19 with these region health indicators. I will split the data 70 train and 30 test. This will leave me with 32 test samples which is adequate to determine the RMSE and judge the ability of the models. 
+
+```{r}
+set.seed(1234)
+index <- sample(length(data[,1]), length(data[,1])*.7)
+
+train_data <- data[index,4:26]
+test_data <- data[-index,5:26]
+test_labels <- data[-index,4]
+```
+
+
+```{r}
+control <- rpart.control(minsplit = 10, cp = 0.01, 
+              maxcompete = 4, maxsurrogate = 5, usesurrogate = 2, xval = 10,
+              surrogatestyle = 0, maxdepth = 30)
+
+treeformula <- death_rate~
+  Uninsured +
+  age_50_60 +
+  overweight +
+  #HD_yes +
+  #cancer_yes
+  Chol_High
+  ##Diabetes_yes +
+  ##Gen_Hlth_bad +
+  ##extremeobesity# +
+  ##obese +
+  ##underweight# +
+  ##normalweight
+  #pop_density 
+tree_model3 <- rpart(treeformula, train_data,control = control)
+
+tree_model3$call
+tree_model3$variable.importance
+tree_model3$cptable
+
+```
+```{r}
+pred_tree3 <- predict(tree_model3, test_data)
+plot(pred_tree3, test_labels)
+```
+```{r}
+jpeg(filename = "rparttree2.jpg")
+rpart.plot(tree_model3)
+dev.off()
+```
+
+
+I will use the e1071 svm package. I will start with the default values as shown in the summary.
+
+```{r}
+library(e1071)
+model_svm <- svm(death_rate~., data = train_data)
+summary(model_svm)
+```
+
+Predict the values from the test data and associated labels. In this case these are continuous death_rate predictions from the regression analysis and not true 'labels'. I plot the death_rate test vs predictions and RMSE.
+
+```{r}
+library(caret)
+pred_svm <- predict(model_svm, test_data)
+plot(pred_svm, test_labels)
+RMSE(pred_svm, test_labels)
+```
+
+If I round the values then I can create a matrix table and show the actual death_rate vs the predicted for each percentage death_rate value. The default svm did not do to bad of a job. It predicted 17 of 32 values correctly. The highest values did not predict well with this format.
+
+```{r}
+table(round(pred_svm,0), round(test_labels,0), dnn = c("Prediction", "test_percent_deaths"))
+```
+
+I will use the tune.svm function to see if I can find the optimal model using the 'radial' kernel. It improved slightly with 19 of 32 correct, but still not so great a predicting above 3% deaths.
+
+```{r}
+optradsvm <- tune.svm(death_rate~., data = train_data, type = "nu-regression", kernel = 'radial', 
+                   epsilon = seq(0, 0.01, 0.001), 
+                   cost = c(0.001, 0.01, 0.1, 1, 10, 100))
+```
+```{r}
+summary(optradsvm)
+print(optradsvm)
+plot(optradsvm)
+```
+```{r}
+BestradSVM <- optradsvm$best.model
+PredBestradsvm <- predict(BestradSVM, test_data)
+
+plot(PredBestradsvm, test_labels)
+RMSE(PredBestradsvm, test_labels)
+table(round(PredBestradsvm,0), round(test_labels,0), dnn = c("Prediction", "test_percent_deaths"))
+```
+
+The linear model seems like a better option for this analysis given the 
+
+
+
+```{r}
+optlinsvm <- tune.svm(death_rate~., data = train_data, type = "nu-regression", kernel = 'linear', 
+                   epsilon = seq(0, 0.01, 0.001), 
+                   cost = c(0.001, 0.01, 0.1, 1, 10, 100))
+```
+```{r}
+print(optlinsvm)
+plot(optlinsvm)
+               
+```
+```{r}
+BestlinSVM <- optlinsvm$best.model
+
+PredBestlinsvm <- predict(BestlinSVM, test_data)
+
+plot(PredBestlinsvm, test_labels)
+RMSE(PredBestlinsvm, test_labels)
+table(round(PredBestlinsvm,0), round(test_labels,0), dnn = c("Prediction", "test_percent_deaths"))
+```
+
+
+
+```{r}
+optsigsvm <- tune.svm(death_rate~., data = train_data, kernel = 'sigmoid', 
+                   epsilon = seq(0, 0.01, 0.001), 
+                   cost = c(0.001, 0.01, 0.1, 1, 10, 100))
+```
+```{r}
+print(optsigsvm)
+plot(optsigsvm)
+               
+```
+```{r}
+BestsigSVM <- optsigsvm$best.model
+
+PredBestsigsvm <- predict(BestsigSVM, test_data)
+
+plot(PredBestsigsvm, test_labels)
+RMSE(PredBestsigsvm, test_labels)
+table(round(PredBestsigsvm,0), round(test_labels,0), dnn = c("Prediction", "test_percent_deaths"))
+```
+
+```{r}
+optpolysvm <- tune.svm(death_rate~., data = train_data, kernel = 'polynomial', 
+                   epsilon = seq(0, 0.01, 0.001), 
+                   cost = c(0.001, 0.01, 0.1, 1, 10, 100))
+```
+```{r}
+print(optpolysvm)
+plot(optpolysvm)
+               
+```
+```{r}
+BestpolySVM <- optpolysvm$best.model
+
+PredBestpolysvm <- predict(BestpolySVM, test_data)
+
+plot(PredBestpolysvm, test_labels)
+RMSE(PredBestpolysvm, test_labels)
+table(round(PredBestpolysvm,0), round(test_labels,0), dnn = c("Prediction", "test_percent_deaths"))
+```
+
+
+
+
+
+
+
+References:
+
+Unknown. (2020). Core based statistical areas (CBSAs), metropolitan divisions, and combined statistical areas (CSAs), March 2020. United States Census Bureau. Obtained November 3, 2020 from: https://www.census.gov/geographies/reference-files/time-series/demo/metro-micro/delineation-files.html (Note: Used for separation of county data and CBSA regions)
