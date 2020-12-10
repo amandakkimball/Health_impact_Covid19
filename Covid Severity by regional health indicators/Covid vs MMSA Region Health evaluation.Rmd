@@ -67,6 +67,11 @@ dev.off()
 Here are the histograms. We see that LA county is the high value for many of the factors, but nothing that is a true outlier with a cause.
 
 ```{r}
+jpeg("histogram_original death data.jpg")
+plot_histogram(data$death_rate)
+dev.off()
+
+
 plot_histogram(data[c(2:4,26)])
 plot_histogram(data[c(11:19)], nrow = 3, ncol = 3)
 plot_histogram(data[c(5:10, 20:25)])
@@ -77,6 +82,20 @@ plot_histogram(data[c(5:10, 20:25)])
 plot_qq(data, by = 'death_rate')
 
 ```
+
+There are only 9 regions above 4 in the dataset and they are significant outliers. I will set all of these values to 4 in my continuous data set. All of these values will fall into the 'severe' category for the categorical dataset split performed next.
+
+```{r}
+data$death_rate <- replace(data$death_rate, data$death_rate > 4, 4)
+```
+
+```{r}
+jpeg("histogram_truncated death data.jpg")
+plot_histogram(data$death_rate)
+dev.off()
+```
+
+
 
 I split the data into severity categories for modeling. The highest quartile is above 2.74, median value is 1.9, and lowest quartile is less than 1.37. This will give me roughly the same number of values in each of my categories.
 
@@ -172,13 +191,13 @@ treeformula <- Severity~
   age_50_60 +
   overweight +
   #HD_yes +
-  #cancer_yes
-  Chol_High
-  ##Diabetes_yes +
-  ##Gen_Hlth_bad +
-  ##extremeobesity# +
-  ##obese +
-  ##underweight# +
+  ##cancer_yes
+  Chol_High 
+  #Diabetes_yes 
+  ###Gen_Hlth_bad +
+  ###extremeobesity# +
+  #obese 
+  ###underweight# +
   #normalweight
   #pop_density 
 tree_model2 <- rpart(treeformula, train_datacl,control = control)
@@ -199,12 +218,13 @@ jpeg(filename = "rparttree.jpg")
 rpart.plot(tree_model2)
 #dev.print(jpg, 'rparttree.jpg')
 dev.off()
+rpart.plot(tree_model2)
 ```
 
 Now to see if I can model the severity of covid19 with these region health indicators. I will split the data 70 train and 30 test. This will leave me with 32 test samples which is adequate to determine the RMSE and judge the ability of the models. 
 
 ```{r}
-set.seed(1234)
+set.seed(42)
 index <- sample(length(data[,1]), length(data[,1])*.7)
 
 train_data <- data[index,4:26]
@@ -221,16 +241,24 @@ control <- rpart.control(minsplit = 10, cp = 0.01,
 treeformula <- death_rate~
   Uninsured +
   age_50_60 +
+  #age_40_50 +
+  #age_30_40 +
+  #age_60_70 +
+  #age_30minus +
+  
+  #age_70plus +
   overweight +
   #HD_yes +
-  #cancer_yes
-  Chol_High
-  ##Diabetes_yes +
-  ##Gen_Hlth_bad +
-  ##extremeobesity# +
-  ##obese +
-  ##underweight# +
-  ##normalweight
+  #cancer_yes +
+  Chol_High 
+  #Smoke_yes 
+  #Diabetes_yes 
+
+  #Gen_Hlth_bad 
+  #extremeobesity# +
+  #obese 
+  #underweight# +
+  #normalweight
   #pop_density 
 tree_model3 <- rpart(treeformula, train_data,control = control)
 
@@ -242,19 +270,57 @@ tree_model3$cptable
 ```{r}
 pred_tree3 <- predict(tree_model3, test_data)
 plot(pred_tree3, test_labels)
+RMSE(pred_tree3, test_labels)
+table(round(pred_tree3,0), round(test_labels,0), dnn = c("Prediction", "test_percent_deaths"))
 ```
 ```{r}
 jpeg(filename = "rparttree2.jpg")
 rpart.plot(tree_model3)
 dev.off()
+rpart.plot(tree_model3)
+
 ```
-
-
+```{r}
+#jpeg(filename = "Tree model predictions.jpg")
+treepred <- predict(tree_model3, test_data)
+par(mfrow=c(2, 2), mgp = c(2, 0.75, 0), mar = c(3, 4, 0, 2))
+plot(test_labels, test_data$Uninsured, xlab = "", ylab="proportion uninsured")
+points(treepred, test_data$Uninsured, col="blue")
+plot(test_labels, test_data$overweight, xlab = "", ylab="proportion overweight")
+points(treepred, test_data$overweight, col="blue")
+plot(test_labels, test_data$Chol_High, xlab = "% Deaths per cases", ylab="proportion cholesterol high")
+points(treepred, test_data$Chol_High, col="blue")
+plot(test_labels, test_data$Diabetes_yes, xlab = "% Deaths per cases", ylab="proportion with diabetes")
+points(treepred, test_data$Diabetes_yes, col="blue")
+#dev.off()
+```
 I will use the e1071 svm package. I will start with the default values as shown in the summary.
 
 ```{r}
 library(e1071)
-model_svm <- svm(death_rate~., data = train_data)
+formula = death_rate~
+  Uninsured +
+  #age_50_60 +
+  #age_40_50 +
+  #age_30_40 +
+  #age_60_70 +
+  #age_30minus +
+  
+  #age_70plus +
+  overweight +
+  #HD_yes +
+  #cancer_yes +
+  Chol_High +
+  #Smoke_yes 
+  Diabetes_yes 
+
+  #Gen_Hlth_bad 
+  #extremeobesity# +
+  #obese 
+  #underweight# +
+  #normalweight
+  #pop_density 
+model_svm <- svm(formula, data = train_data)
 summary(model_svm)
 ```
 
@@ -276,7 +342,7 @@ table(round(pred_svm,0), round(test_labels,0), dnn = c("Prediction", "test_perce
 I will use the tune.svm function to see if I can find the optimal model using the 'radial' kernel. It improved slightly with 19 of 32 correct, but still not so great a predicting above 3% deaths.
 
 ```{r}
-optradsvm <- tune.svm(death_rate~., data = train_data, type = "nu-regression", kernel = 'radial', 
+optradsvm <- tune.svm(formula, data = train_data, type = "nu-regression", kernel = 'radial', 
                    epsilon = seq(0, 0.01, 0.001), 
                    cost = c(0.001, 0.01, 0.1, 1, 10, 100))
 ```
@@ -299,7 +365,7 @@ The linear model seems like a better option for this analysis given the
 
 
 ```{r}
-optlinsvm <- tune.svm(death_rate~., data = train_data, type = "nu-regression", kernel = 'linear', 
+optlinsvm <- tune.svm(formula, data = train_data, type = "nu-regression", kernel = 'linear', 
                    epsilon = seq(0, 0.01, 0.001), 
                    cost = c(0.001, 0.01, 0.1, 1, 10, 100))
 ```
@@ -321,7 +387,7 @@ table(round(PredBestlinsvm,0), round(test_labels,0), dnn = c("Prediction", "test
 
 
 ```{r}
-optsigsvm <- tune.svm(death_rate~., data = train_data, kernel = 'sigmoid', 
+optsigsvm <- tune.svm(formula, data = train_data, kernel = 'sigmoid', 
                    epsilon = seq(0, 0.01, 0.001), 
                    cost = c(0.001, 0.01, 0.1, 1, 10, 100))
 ```
@@ -341,7 +407,7 @@ table(round(PredBestsigsvm,0), round(test_labels,0), dnn = c("Prediction", "test
 ```
 
 ```{r}
-optpolysvm <- tune.svm(death_rate~., data = train_data, kernel = 'polynomial', 
+optpolysvm <- tune.svm(formula, data = train_data, kernel = 'polynomial', 
                    epsilon = seq(0, 0.01, 0.001), 
                    cost = c(0.001, 0.01, 0.1, 1, 10, 100))
 ```
@@ -360,11 +426,162 @@ RMSE(PredBestpolysvm, test_labels)
 table(round(PredBestpolysvm,0), round(test_labels,0), dnn = c("Prediction", "test_percent_deaths"))
 ```
 
+```{r}
+
+formula = death_rate~
+  Uninsured +
+  age_50_60 +
+  #age_40_50 +
+  #age_30_40 +
+  #age_60_70 +
+  #age_30minus +
+  
+  #age_70plus +
+  #overweight +
+  #HD_yes +
+  #cancer_yes +
+  Chol_High +
+  #Smoke_yes 
+  #Diabetes_yes 
+
+  #Gen_Hlth_bad 
+  #extremeobesity# +
+  #obese 
+  #underweight# +
+  normalweight
+  #pop_density 
+```
+```{r}
+optsvm <- svm(formula, data = train_data, type = "nu-regression", kernel = 'linear')
+                   #epsilon = 0, cost = 0.1)
+```
+```{r}
+prediction <- predict(optsvm, test_data)
+par(mfrow=c(2, 2), mgp = c(2, 0.75, 0), mar = c(3, 4, 0, 2))
+plot(data$death_rate, data$Uninsured, xlab = "", ylab="proportion uninsured")
+points(prediction, test_data$Uninsured, col="blue")
+plot(data$death_rate, data$overweight, xlab = "", ylab="proportion overweight")
+points(prediction, test_data$overweight, col="blue")
+plot(data$death_rate, data$Chol_High, xlab = "% Deaths per cases", ylab="proportion cholesterol high")
+points(prediction, test_data$Chol_High, col="blue")
+plot(data$death_rate, data$Diabetes_yes, xlab = "% Deaths per cases", ylab="proportion Diabetes")
+points(prediction, test_data$Diabetes_yes, col="blue")
+```
+```{r}
+jpeg(filename = "Linear SVM Predictions.jpg")
+prediction <- predict(optsvm, test_data)
+par(mfrow=c(2, 2), mgp = c(2, 0.75, 0), mar = c(3, 4, 0, 2))
+plot(test_labels, test_data$Uninsured, xlab = "", ylab="proportion uninsured")
+points(prediction, test_data$Uninsured, col="light blue")
+plot(test_labels, test_data$overweight, xlab = "", ylab="proportion overweight")
+points(prediction, test_data$overweight, col="light blue")
+plot(test_labels, test_data$Chol_High, xlab = "% Deaths per cases", ylab="proportion cholesterol high")
+points(prediction, test_data$Chol_High, col="light blue")
+plot(test_labels, test_data$age_50_60, xlab = "% Deaths per cases", ylab="proportion age 50-60")
+points(prediction, test_data$age_50_60, col="light blue")
+dev.off()
+```
+```{r}
+#jpeg(filename = "SVM 5D plot.jpg")
+plot(test_labels, test_data$Uninsured, xlab = "% Death rate", ylab="proportion uninsured", pch = (test_data$age_50_60)/.09, cex = (test_data$overweight)/.18, lwd = test_data$Chol_High/.14)
+points(prediction, test_data$Uninsured, col="blue", pch = (test_data$age_50_60)/.09, cex = (test_data$overweight)/.18, lwd = test_data$Chol_High/.14)
+legend(2.4, .19, legend = c("Prediction Color", "Raw data Color", "High 50-60 age symbol", "High cholesterol line width", "High Overweight shape size"), col = c("blue", "black", "black", "black", "black"), pch = c(1,1,2,1,1), lwd = c(1,1,1,2,1), pt.cex = c(1,1,1,1,2))
+#dev.off()
+```
+
+
+
+```{r}
+library(randomForest)
+rand_model <- randomForest(death_rate~.,data = train_data)
+rand_model$importance
+```
+```{r}
+pred <- predict(rand_model, test_data)
+plot(pred, test_labels, xlim = c(0,4), ylim=c(0,4))
+(z <- line(test_labels, test_labels))
+abline((z))
+RMSE(pred, test_labels)
+table(round(pred,0), round(test_labels,0), dnn = c("Prediction", "test_percent_deaths"))
+```
+```{r}
+formula = death_rate~
+  Uninsured +
+  age_50_60 +
+  #age_40_50 +
+  #age_30_40 +
+  #age_60_70 +
+  #age_30minus +
+  
+  #age_70plus +
+  overweight +
+  #HD_yes +
+  #cancer_yes +
+  Chol_High  
+  #Smoke_yes +
+  #Diabetes_yes 
+
+  #Gen_Hlth_bad 
+  #extremeobesity# +
+  #obese 
+  #underweight# +
+  #normalweight 
+  #pop_density 
+rand_model <- randomForest(formula, data = train_data)
+pred <- predict(rand_model, test_data)
+plot(pred, test_labels, xlim = c(0,4), ylim=c(0,4))
+(z <- line(test_labels, test_labels))
+abline((z))
+RMSE(pred, test_labels)
+table(round(pred,0), round(test_labels,0), dnn = c("Prediction", "test_percent_deaths"))
+rand_model$importance
+```
+
+```{r}
+#jpeg(filename = "RandomForest 5D plot.jpg")
+par(mfrow=c(2, 2), mgp = c(2, 0.75, 0), mar = c(3, 4, 0, 2))
+plot(test_labels, test_data$Uninsured, xlab = "", ylab="proportion uninsured")
+points(pred, test_data$Uninsured, col="blue")
+plot(test_labels, test_data$overweight, xlab = "", ylab="proportion overweight")
+points(pred, test_data$overweight, col="blue")
+plot(test_labels, test_data$Chol_High, xlab = "% Deaths per cases", ylab="proportion with high cholesterol")
+points(pred, test_data$Chol_High, col="blue")
+plot(test_labels, test_data$age_50_60, xlab = "% Deaths per cases", ylab="proportion age 50-60")
+points(pred, test_data$age_50_60, col="blue")
+#dev.off()
+```
+
+```{r}
+jpeg(filename = "Model Predictions.jpg")
+z <- line(test_labels, test_labels)
+op <- par(mfrow = c(2,2), mar = c(4, 4, 1.5, 0))
+plot(treepred, test_labels, xlim = c(0,5), ylim=c(0,5), main = "Decision Tree Predictions", 
+     xlab = "Predictions", ylab = "% deaths per cases - actual")
+abline(z)
+plot(pred, test_labels, xlim = c(0,5), ylim=c(0,5), main = "Random Forest Predictions", 
+     xlab = "Predictions", ylab = "")
+abline(z)
+plot(prediction, test_labels, xlim = c(0,5), ylim=c(0,5), main = "Linear SVM Predictions", 
+     xlab = "Predictions", ylab = "")
+abline(z)
+dev.off()
+```
+```{r}
+#jpeg(filename = "SVM 5D plot.jpg")
+plot(prediction, test_labels, xlab = "Prediction", ylab="%Death_rate", pch = (test_data$age_50_60)/.09, cex = (test_data$overweight)/.18, lwd = test_data$Chol_High/.14, col = ifelse(test_data$Uninsured>.1, "blue","black"))
+#points(test_data$Uninsured, test_labels, col="blue", pch = (test_data$age_50_60)/.09, cex = (test_data$overweight)/.18, lwd = test_data$Chol_High/.14)
+legend(-.4, 4.1, legend = c("High uninsured population", "High 50-60 age symbol", "High cholesterol line width", "High Overweight shape size"), col = c("blue", "black", "black", "black"), pch = c(1,2,1,1), lwd = c(1,1,2,1), pt.cex = c(1,1,1,2))
+#dev.off()
+```
 
 
 
 
-
+```{r}
+RMSE(treepred, test_labels)
+RMSE(pred, test_labels)
+RMSE(prediction, test_labels)
+```
 
 References:
 
